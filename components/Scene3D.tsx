@@ -18,6 +18,7 @@ import type { AnimationClip, Group } from 'three';
 import travelerModel from '../assets/models/traveler_1.glb';
 import { BlobShadow } from './world/BlobShadow';
 import { CurvedGround } from './world/CurvedGround';
+import { GrassField } from './world/GrassField';
 import { HorizonSky } from './world/HorizonSky';
 import { palette } from './world/palette';
 import { PineForest } from './world/PineForest';
@@ -209,6 +210,7 @@ export function Scene3D({ steps }: { steps: number }) {
           <WorldScrollRoot steps={steps}>
             <ScrollingEnvironment>
               <CurvedGround />
+              <GrassField />
               <PineForest />
             </ScrollingEnvironment>
 
