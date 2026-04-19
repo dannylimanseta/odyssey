@@ -16,6 +16,7 @@ import {
   TREE_COUNT,
   TREE_PATH_EXCLUSION_HALF_WIDTH,
   TREE_RECYCLE_Z,
+  TREE_SINK_DEPTH,
   TREE_SPAWN_Z,
 } from './constants';
 import { palette } from './palette';
@@ -128,8 +129,8 @@ export function PineForest() {
       /** Ground is world-anchored at z = 0 with bend −worldZ²/(2R); read Y from the tree's current world Z. */
       const treeWorldZ = -scroll + z;
       const bend = groundBendY(treeWorldZ);
-      const surfaceY = GROUND_SURFACE_Y + bend;
-      /** Trunk base at surfaceY; cone base flush on trunk top (Three Y-up cylinders / cones). */
+      /** Sink the whole tree so trunk roots are buried and the silhouette reads as grounded. */
+      const surfaceY = GROUND_SURFACE_Y + bend - TREE_SINK_DEPTH;
       const yTrunk = surfaceY + TRUNK_HALF;
       const yCone = yTrunk + TRUNK_HALF + CONE_HALF;
 

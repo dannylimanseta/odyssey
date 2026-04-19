@@ -8,8 +8,11 @@ type RimMaterial = Material & {
 };
 
 /**
- * Soft Fresnel rim added just before opaque_fragment (works on Lambert + Physical).
- * Chains with existing onBeforeCompile. Safe to call once per material.
+ * Soft Fresnel rim added just before opaque_fragment.
+ * Uses the view-space `normal` (set up by `<normal_fragment_begin>` in all built-in
+ * materials) and approximates N·V with the normal's Z component, so we do NOT depend
+ * on `vViewPosition` — which Lambert's fragment does not declare.
+ * Chains with any existing onBeforeCompile. Safe to call once per material.
  */
 export function applyRimHighlight(material: RimMaterial, rimColor: Color, strength = 0.32) {
   if (material.userData.rimApplied) return;
@@ -33,8 +36,7 @@ uniform float uRimStrength;`,
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <opaque_fragment>',
-      `vec3 rimV = normalize( vViewPosition );
-float rimNdotV = clamp( dot( normalize( normal ), rimV ), 0.0, 1.0 );
+      `float rimNdotV = clamp( normalize( normal ).z, 0.0, 1.0 );
 float rimTerm = pow( 1.0 - rimNdotV, 2.15 );
 outgoingLight += uRimColor * rimTerm * uRimStrength;
 #include <opaque_fragment>`,

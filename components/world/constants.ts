@@ -15,10 +15,10 @@ export const GROUND_DEPTH = 46;
 export const GROUND_RADIUS = 38;
 export const GROUND_THETA = 0.42;
 /**
- * Large radius for Animal Crossing–style roll: y ≈ -z² / (2R) along the path.
- * Larger R = gentler curve.
+ * Animal Crossing–style roll: y ≈ -z² / (2R) along the path.
+ * Smaller R = more dramatic fall-off toward the horizon.
  */
-export const GROUND_CURVE_RADIUS = 92;
+export const GROUND_CURVE_RADIUS = 38;
 /** Base Y of the ground mesh inside the scrolling group (matches trees + bend). */
 export const GROUND_SURFACE_Y = -0.34;
 /**
@@ -39,9 +39,11 @@ export function groundBendY(localZ: number): number {
 export const TREE_RECYCLE_Z = 4;
 /** Respawn trees this far ahead (local -Z in env group). */
 export const TREE_SPAWN_Z = -32;
-export const TREE_COUNT = 18;
+export const TREE_COUNT = 42;
 /**
  * Lateral half-width of the cleared strip along the path (world X).
  * Trees spawn only outside [-TREE_PATH_EXCLUSION_HALF_WIDTH, +…] so the traveler stays visible.
  */
 export const TREE_PATH_EXCLUSION_HALF_WIDTH = 1.45;
+/** How far the trunk base sinks below the curved surface (world units). */
+export const TREE_SINK_DEPTH = 0.22;

@@ -122,22 +122,24 @@ function SunShadowLight() {
     if (!light) return;
     const cam = light.shadow.camera;
     light.shadow.mapSize.set(2048, 2048);
-    cam.near = 0.6;
-    cam.far = 100;
-    cam.left = -44;
-    cam.right = 44;
-    cam.top = 44;
-    cam.bottom = -44;
-    light.shadow.bias = -0.00014;
-    light.shadow.normalBias = 0.028;
+    /** Tight bounds around where the traveler + near trees live → crisp hero shadow on 2K atlas. */
+    cam.near = 0.4;
+    cam.far = 60;
+    cam.left = -12;
+    cam.right = 12;
+    cam.top = 14;
+    cam.bottom = -10;
+    light.shadow.bias = -0.00012;
+    light.shadow.normalBias = 0.02;
+    cam.updateProjectionMatrix();
   }, []);
 
   return (
     <directionalLight
       ref={ref}
       castShadow
-      position={[14, 28, 12]}
-      intensity={1.32}
+      position={[6, 10, 5]}
+      intensity={1.45}
       color="#fff8f3"
     />
   );
@@ -166,9 +168,9 @@ export function Scene3D({ steps }: { steps: number }) {
                 gl.shadowMap.type = PCFSoftShadowMap;
               }}
             >
-              <ambientLight intensity={0.64} />
+              <ambientLight intensity={0.46} />
               <SunShadowLight />
-              <directionalLight position={[-5.5, 4.2, -7.5]} intensity={0.36} color="#bfd6ff" />
+              <directionalLight position={[-5.5, 4.2, -7.5]} intensity={0.3} color="#bfd6ff" />
 
               <HorizonSky />
 
