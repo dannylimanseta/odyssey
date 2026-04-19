@@ -24,8 +24,9 @@ export const GROUND_SURFACE_Y = -0.34;
 /**
  * Extra world Y above the curved surface so the GLB’s feet sit on the ground at scroll 0.
  * Traveler uses `GROUND_SURFACE_Y + groundBendY(scroll) + this` each frame.
+ * Kept tiny — at the current DISPLAY_SCALE the previous 0.06 read as visible float.
  */
-export const TRAVELER_FOOT_CLEARANCE = 0.06;
+export const TRAVELER_FOOT_CLEARANCE = 0.0;
 
 /**
  * Height of the rolling lawn at local Z (same math as the ground vertex shader).
@@ -44,6 +45,6 @@ export const TREE_COUNT = 42;
  * Lateral half-width of the cleared strip along the path (world X).
  * Trees spawn only outside [-TREE_PATH_EXCLUSION_HALF_WIDTH, +…] so the traveler stays visible.
  */
-export const TREE_PATH_EXCLUSION_HALF_WIDTH = 1.45;
+export const TREE_PATH_EXCLUSION_HALF_WIDTH = 0.7;
 /** How far the trunk base sinks below the curved surface (world units). */
 export const TREE_SINK_DEPTH = 0.22;
