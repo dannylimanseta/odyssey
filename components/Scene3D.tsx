@@ -1,21 +1,35 @@
 import { useGLTF, useAnimations } from '@react-three/drei/native';
 import { Canvas } from '@react-three/fiber/native';
 import { Asset } from 'expo-asset';
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Color, Fog } from 'three';
+import {
+  Color,
+  DirectionalLight,
+  Fog,
+  LoopRepeat,
+  Mesh,
+  MeshPhysicalMaterial,
+  MeshStandardMaterial,
+  PCFSoftShadowMap,
+} from 'three';
 import type { AnimationClip, Group } from 'three';
-import { LoopRepeat } from 'three';
 
 import travelerModel from '../assets/models/traveler_1.glb';
-import { CurvedGround, GroundTintBand } from './world/CurvedGround';
+import { CurvedGround } from './world/CurvedGround';
 import { HorizonSky } from './world/HorizonSky';
 import { palette } from './world/palette';
 import { PineForest } from './world/PineForest';
-import { ScrollingEnvironment } from './world/ScrollingEnvironment';
+import { applyRimHighlight } from './world/rimMaterial';
+import { ScrollingEnvironment, WorldScrollRoot } from './world/ScrollingEnvironment';
+import { GROUND_SURFACE_Y, TRAVELER_FOOT_CLEARANCE } from './world/constants';
 
 /** Previous hero scale; current size is 30% of that (70% smaller). */
 const DISPLAY_SCALE = 1.35 * 0.3;
+
+/** Fixed rig. Ground is a stable horizon curve (crest at z=0), so no y follow needed. */
+const VIEW_CAMERA_Y = 0.52;
+const VIEW_CAMERA_Z = 1.82;
 
 function useLocalModelUri(assetModule: number) {
   const [uri, setUri] = useState<string | null>(null);
@@ -61,6 +75,22 @@ function Traveler({ uri }: TravelerProps) {
   const { scene, animations } = useGLTF(uri, false, false);
   const { actions } = useAnimations(animations, groupRef);
 
+  useLayoutEffect(() => {
+    const rim = new Color(palette.rim);
+    scene.traverse((child) => {
+      if (!(child instanceof Mesh)) return;
+      child.castShadow = true;
+      child.receiveShadow = true;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const mat of materials) {
+        if (!mat) continue;
+        if (mat instanceof MeshStandardMaterial || mat instanceof MeshPhysicalMaterial) {
+          applyRimHighlight(mat, rim, 0.26);
+        }
+      }
+    });
+  }, [scene]);
+
   useEffect(() => {
     const clip = pickWalkClip(animations);
     if (!clip) return;
@@ -76,11 +106,40 @@ function Traveler({ uri }: TravelerProps) {
     <group
       ref={groupRef}
       rotation={[0, Math.PI / 2, 0]}
-      position={[0, -0.28, 0]}
+      position={[0, GROUND_SURFACE_Y + TRAVELER_FOOT_CLEARANCE, 0]}
       scale={[DISPLAY_SCALE, DISPLAY_SCALE, DISPLAY_SCALE]}
     >
       <primitive object={scene} />
     </group>
+  );
+}
+
+function SunShadowLight() {
+  const ref = useRef<DirectionalLight>(null);
+
+  useLayoutEffect(() => {
+    const light = ref.current;
+    if (!light) return;
+    const cam = light.shadow.camera;
+    light.shadow.mapSize.set(2048, 2048);
+    cam.near = 0.6;
+    cam.far = 100;
+    cam.left = -44;
+    cam.right = 44;
+    cam.top = 44;
+    cam.bottom = -44;
+    light.shadow.bias = -0.00014;
+    light.shadow.normalBias = 0.028;
+  }, []);
+
+  return (
+    <directionalLight
+      ref={ref}
+      castShadow
+      position={[14, 28, 12]}
+      intensity={1.32}
+      color="#fff8f3"
+    />
   );
 }
 
@@ -98,28 +157,31 @@ export function Scene3D({ steps }: { steps: number }) {
           <View style={{ height: '50%', width: '100%' }}>
             <Canvas
               style={{ flex: 1 }}
-              camera={{ position: [0, 0.52, 1.82], fov: 42 }}
+              camera={{ position: [0, VIEW_CAMERA_Y, VIEW_CAMERA_Z], fov: 42 }}
               gl={{ antialias: true }}
-              onCreated={({ scene }) => {
+              onCreated={({ scene, gl }) => {
                 scene.background = new Color(palette.skyTop);
                 scene.fog = new Fog(new Color(palette.fog), 5, 38);
+                gl.shadowMap.enabled = true;
+                gl.shadowMap.type = PCFSoftShadowMap;
               }}
             >
-              <ambientLight intensity={1.1} />
-              <directionalLight position={[5, 10, 6]} intensity={1.15} color="#fff5f0" />
-              <directionalLight position={[-4, 3, -6]} intensity={0.35} color="#b8d4ff" />
+              <ambientLight intensity={0.64} />
+              <SunShadowLight />
+              <directionalLight position={[-5.5, 4.2, -7.5]} intensity={0.36} color="#bfd6ff" />
 
               <HorizonSky />
 
-              <ScrollingEnvironment steps={steps}>
-                <CurvedGround />
-                <GroundTintBand />
-                <PineForest />
-              </ScrollingEnvironment>
+              <WorldScrollRoot steps={steps}>
+                <ScrollingEnvironment>
+                  <CurvedGround />
+                  <PineForest />
+                </ScrollingEnvironment>
 
-              <Suspense fallback={null}>
-                <Traveler uri={uri} />
-              </Suspense>
+                <Suspense fallback={null}>
+                  <Traveler uri={uri} />
+                </Suspense>
+              </WorldScrollRoot>
             </Canvas>
           </View>
         </View>

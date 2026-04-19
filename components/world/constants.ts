@@ -1,5 +1,5 @@
 /** World units per new pedometer step (tunable). */
-export const STEP_TO_WORLD = 0.5;
+export const STEP_TO_WORLD = 0.3;
 /** Idle drift along the path when not stepping (units/sec). */
 export const IDLE_SCROLL_SPEED = 0.38;
 /** Scale idle down right after a step so walking feels step-driven. */
@@ -21,6 +21,11 @@ export const GROUND_THETA = 0.42;
 export const GROUND_CURVE_RADIUS = 92;
 /** Base Y of the ground mesh inside the scrolling group (matches trees + bend). */
 export const GROUND_SURFACE_Y = -0.34;
+/**
+ * Extra world Y above the curved surface so the GLB’s feet sit on the ground at scroll 0.
+ * Traveler uses `GROUND_SURFACE_Y + groundBendY(scroll) + this` each frame.
+ */
+export const TRAVELER_FOOT_CLEARANCE = 0.06;
 
 /**
  * Height of the rolling lawn at local Z (same math as the ground vertex shader).
@@ -35,3 +40,8 @@ export const TREE_RECYCLE_Z = 4;
 /** Respawn trees this far ahead (local -Z in env group). */
 export const TREE_SPAWN_Z = -32;
 export const TREE_COUNT = 18;
+/**
+ * Lateral half-width of the cleared strip along the path (world X).
+ * Trees spawn only outside [-TREE_PATH_EXCLUSION_HALF_WIDTH, +…] so the traveler stays visible.
+ */
+export const TREE_PATH_EXCLUSION_HALF_WIDTH = 1.45;

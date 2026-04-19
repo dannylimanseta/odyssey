@@ -7,9 +7,10 @@ export const palette = {
   hill: '#9db8a8',
   hillDark: '#7a9b8f',
   ground: '#7cb88a',
-  groundEdge: '#5e9b72',
   fog: '#c8dde8',
   pine: '#6eb899',
   pineVariant: '#5aa88a',
   trunk: '#8b7355',
+  /** Warm highlight for rim-lit edges (Lambert / Standard patch). */
+  rim: '#fff2e6',
 } as const;
