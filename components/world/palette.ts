@@ -11,6 +11,6 @@ export const palette = {
   pine: '#6eb899',
   pineVariant: '#5aa88a',
   trunk: '#8b7355',
-  /** Warm highlight for rim-lit edges (Lambert / Standard patch). */
-  rim: '#fff2e6',
+  /** Warm yellow rim on lit edges (Lambert / Standard patch). */
+  rim: '#ffd080',
 } as const;

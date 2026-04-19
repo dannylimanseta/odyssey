@@ -4,6 +4,7 @@ import { Color, DoubleSide, MeshLambertMaterial, PlaneGeometry } from 'three';
 import type { Mesh } from 'three';
 
 import { GROUND_CURVE_RADIUS, GROUND_DEPTH, GROUND_SURFACE_Y, GROUND_WIDTH } from './constants';
+import { applyDistanceDefocus } from './distanceDefocusMaterial';
 import { applyGroundCurveBend } from './groundCurveMaterial';
 import { palette } from './palette';
 import { applyRimHighlight } from './rimMaterial';
@@ -30,6 +31,7 @@ export function CurvedGround() {
       depthTest: true,
     });
     applyGroundCurveBend(m, GROUND_CURVE_RADIUS);
+    applyDistanceDefocus(m, { hazeColor: new Color(palette.fog), near: 5, far: 36 });
     applyRimHighlight(m, new Color(palette.rim), 0.34);
 
     return { geometry: g, material: m };

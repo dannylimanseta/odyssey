@@ -1,7 +1,7 @@
 /** World units per new pedometer step (tunable). */
-export const STEP_TO_WORLD = 0.3;
+export const STEP_TO_WORLD = 1.9;
 /** Idle drift along the path when not stepping (units/sec). */
-export const IDLE_SCROLL_SPEED = 0.38;
+export const IDLE_SCROLL_SPEED = 0.76;
 /** Scale idle down right after a step so walking feels step-driven. */
 export const IDLE_DAMPING_AFTER_STEP = 0.28;
 /** Horizontal ground quad — lateral (world X). */
@@ -40,7 +40,7 @@ export function groundBendY(localZ: number): number {
 export const TREE_RECYCLE_Z = 4;
 /** Respawn trees this far ahead (local -Z in env group). */
 export const TREE_SPAWN_Z = -32;
-export const TREE_COUNT = 42;
+export const TREE_COUNT = 72;
 /**
  * Lateral half-width of the cleared strip along the path (world X).
  * Trees spawn only outside [-TREE_PATH_EXCLUSION_HALF_WIDTH, +…] so the traveler stays visible.

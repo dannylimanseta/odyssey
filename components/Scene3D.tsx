@@ -21,6 +21,7 @@ import { CurvedGround } from './world/CurvedGround';
 import { HorizonSky } from './world/HorizonSky';
 import { palette } from './world/palette';
 import { PineForest } from './world/PineForest';
+import { applyDistanceDefocus } from './world/distanceDefocusMaterial';
 import { applyRimHighlight } from './world/rimMaterial';
 import { ScrollingEnvironment, WorldScrollRoot } from './world/ScrollingEnvironment';
 import { GROUND_SURFACE_Y, TRAVELER_FOOT_CLEARANCE } from './world/constants';
@@ -108,6 +109,7 @@ function Traveler({ uri }: TravelerProps) {
           mat.needsUpdate = true;
         }
         if (mat instanceof MeshStandardMaterial || mat instanceof MeshPhysicalMaterial) {
+          applyDistanceDefocus(mat, { hazeColor: new Color(palette.fog), near: 4, far: 28, strength: 0.55 });
           applyRimHighlight(mat, rim, 0.26);
         }
       }
@@ -191,7 +193,7 @@ export function Scene3D({ steps }: { steps: number }) {
           gl={{ antialias: true }}
           onCreated={({ scene, gl, camera }) => {
             scene.background = new Color(palette.skyTop);
-            scene.fog = new Fog(new Color(palette.fog), 5, 38);
+            scene.fog = new Fog(new Color(palette.fog), 5, 46);
             gl.shadowMap.enabled = true;
             gl.shadowMap.type = PCFSoftShadowMap;
             camera.lookAt(0, VIEW_LOOK_Y, VIEW_LOOK_Z);
