@@ -3,10 +3,16 @@ import { Canvas } from '@react-three/fiber/native';
 import { Asset } from 'expo-asset';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { Color, Fog } from 'three';
 import type { AnimationClip, Group } from 'three';
 import { LoopRepeat } from 'three';
 
 import travelerModel from '../assets/models/traveler_1.glb';
+import { CurvedGround, GroundTintBand } from './world/CurvedGround';
+import { HorizonSky } from './world/HorizonSky';
+import { palette } from './world/palette';
+import { PineForest } from './world/PineForest';
+import { ScrollingEnvironment } from './world/ScrollingEnvironment';
 
 /** Previous hero scale; current size is 30% of that (70% smaller). */
 const DISPLAY_SCALE = 1.35 * 0.3;
@@ -28,10 +34,6 @@ function useLocalModelUri(assetModule: number) {
   return uri;
 }
 
-/**
- * Prefer a real walk clip; avoid the long 15s `NlaTrack` (idle / full timeline).
- * This file names walk-style strips `NlaTrack.001` (≈2s) / `NlaTrack.002` (≈1s).
- */
 function pickWalkClip(clips: AnimationClip[]) {
   const byWalkName = clips.find((c) => /walk|Walk|stride|Stride|jog|Jog/i.test(c.name));
   if (byWalkName) return byWalkName;
@@ -82,7 +84,7 @@ function Traveler({ uri }: TravelerProps) {
   );
 }
 
-export function Scene3D({ steps: _steps }: { steps: number }) {
+export function Scene3D({ steps }: { steps: number }) {
   const uri = useLocalModelUri(travelerModel);
 
   return (
@@ -96,11 +98,25 @@ export function Scene3D({ steps: _steps }: { steps: number }) {
           <View style={{ height: '50%', width: '100%' }}>
             <Canvas
               style={{ flex: 1 }}
-              camera={{ position: [0, 0.42, 1.75], fov: 42 }}
+              camera={{ position: [0, 0.52, 1.82], fov: 42 }}
+              gl={{ antialias: true }}
+              onCreated={({ scene }) => {
+                scene.background = new Color(palette.skyTop);
+                scene.fog = new Fog(new Color(palette.fog), 5, 38);
+              }}
             >
-              <ambientLight intensity={Math.PI / 2} />
-              <directionalLight position={[4, 8, 6]} intensity={1.35} />
-              <directionalLight position={[-3, 2, -4]} intensity={0.35} />
+              <ambientLight intensity={1.1} />
+              <directionalLight position={[5, 10, 6]} intensity={1.15} color="#fff5f0" />
+              <directionalLight position={[-4, 3, -6]} intensity={0.35} color="#b8d4ff" />
+
+              <HorizonSky />
+
+              <ScrollingEnvironment steps={steps}>
+                <CurvedGround />
+                <GroundTintBand />
+                <PineForest />
+              </ScrollingEnvironment>
+
               <Suspense fallback={null}>
                 <Traveler uri={uri} />
               </Suspense>
