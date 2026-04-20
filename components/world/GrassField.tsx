@@ -24,7 +24,7 @@ import { palette } from './palette';
 import { useWorldScrollRef } from './ScrollContext';
 
 /** Blade count scales with lawn area (see GRASS_X_SPREAD_MUL). */
-const GRASS_COUNT = 7000;
+const GRASS_COUNT = 10000;
 /** Plane width before instance scale; world width = this × scaleXZ. */
 const BLADE_WIDTH = 0.05;
 /** Sprite height in world units (width follows plane aspect). */

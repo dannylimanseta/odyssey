@@ -37,7 +37,7 @@ import { useWorldScrollRef } from './ScrollContext';
 const TREE_SPRITE_MODULES = [treeImg1, treeImg2, treeImg3, treeImg4] as const;
 const NUM_SPRITE_VARIANTS = TREE_SPRITE_MODULES.length;
 
-const TREE_SCALE = 1.48;
+const TREE_SCALE = 1.2;
 const SPRITE_W = 1.25 * TREE_SCALE;
 const SPRITE_H = 1.9 * TREE_SCALE;
 /** Extra downward nudge so sprite bases sit slightly deeper into the lawn. */

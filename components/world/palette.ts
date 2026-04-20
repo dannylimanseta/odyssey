@@ -1,13 +1,13 @@
 /** Pastel AC-style palette — shared across sky, fog, ground, props. */
 export const palette = {
-  skyTop: '#8ec5f2',
-  skyMid: '#d4e8f7',
-  skyHorizon: '#fde8dc',
-  skyWarm: '#f5c9d4',
+  skyTop: '#94b0e8',
+  skyMid: '#d8e0f4',
+  skyHorizon: '#f2e8f2',
+  skyWarm: '#e8cfe0',
   hill: '#9db8a8',
   hillDark: '#7a9b8f',
   ground: '#88AB65',
-  fog: '#c8dde8',
+  fog: '#cfd6ea',
   pine: '#6eb899',
   pineVariant: '#5aa88a',
   trunk: '#8b7355',
