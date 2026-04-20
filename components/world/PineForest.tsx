@@ -5,7 +5,6 @@ import { Asset } from 'expo-asset';
 import {
   Color,
   DoubleSide,
-  Euler,
   InstancedMesh,
   Matrix4,
   MeshBasicMaterial,
@@ -42,20 +41,23 @@ const SPRITE_W = 1.25 * TREE_SCALE;
 const SPRITE_H = 1.9 * TREE_SCALE;
 /** Extra downward nudge so sprite bases sit slightly deeper into the lawn. */
 const SPRITE_GROUND_SINK = 0.09;
+/** Radians; tilt around local X after yaw (billboard wind lean). */
+const TREE_SWAY_LEAN_AMP = 0.065;
+const TREE_SWAY_ROLL_AMP = 0.026;
 
 function randomInRange(seed: number, lo: number, hi: number) {
   const x = Math.sin(seed * 127.1) * 43758.5453;
   return lo + (x - Math.floor(x)) * (hi - lo);
 }
 
-function randomTreeX(seed: number, xSpread: number, exclusionHalfWidth: number) {
+/** `onLeft`: even tree indices use left, odd use right so both path sides stay populated. */
+function randomTreeX(seed: number, xSpread: number, exclusionHalfWidth: number, onLeft: boolean) {
   const gap = Math.min(exclusionHalfWidth, xSpread * 0.92);
   const leftLo = -xSpread;
   const leftHi = -gap;
   const rightLo = gap;
   const rightHi = xSpread;
-  const pick = randomInRange(seed * 1.93, 0, 1);
-  if (pick < 0.5) {
+  if (onLeft) {
     return randomInRange(seed * 2.47, leftLo, leftHi);
   }
   return randomInRange(seed * 4.11, rightLo, rightHi);
@@ -148,7 +150,11 @@ function PineForestInstanced({ uris }: InstancedProps) {
   const m = useMemo(() => new Matrix4(), []);
   const pos = useMemo(() => new Vector3(), []);
   const quat = useMemo(() => new Quaternion(), []);
-  const euler = useMemo(() => new Euler(), []);
+  const swayQX = useMemo(() => new Quaternion(), []);
+  const swayQZ = useMemo(() => new Quaternion(), []);
+  const xAxis = useMemo(() => new Vector3(1, 0, 0), []);
+  const yAxis = useMemo(() => new Vector3(0, 1, 0), []);
+  const zAxis = useMemo(() => new Vector3(0, 0, 1), []);
   const scaleV = useMemo(() => new Vector3(1, 1, 1), []);
 
   const xSpread = GROUND_WIDTH * 0.4;
@@ -158,7 +164,8 @@ function PineForestInstanced({ uris }: InstancedProps) {
     if (st.initialized) return;
     st.initialized = true;
     for (let i = 0; i < TREE_COUNT; i++) {
-      st.x[i] = randomTreeX(i * 1.71, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH);
+      const onLeft = (i & 1) === 0;
+      st.x[i] = randomTreeX(i * 1.71, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH, onLeft);
       st.z[i] = TREE_SPAWN_Z + randomInRange(i * 3.31, 2, 22);
     }
   };
@@ -167,11 +174,15 @@ function PineForestInstanced({ uris }: InstancedProps) {
     initLayout();
     const scroll = scrollRef?.current ?? 0;
     const st = state.current;
+    const t = performance.now() * 0.001;
+    const camX = camera.position.x;
+    const camZ = camera.position.z;
 
     for (let i = 0; i < TREE_COUNT; i++) {
       let zi = st.z[i];
       if (-scroll + zi > TREE_RECYCLE_Z) {
-        st.x[i] = randomTreeX(scroll + i * 7.1, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH);
+        const onLeft = (i & 1) === 0;
+        st.x[i] = randomTreeX(scroll + i * 7.1, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH, onLeft);
         const ahead = TREE_SPAWN_Z + randomInRange(scroll + i * 2.9, 0, 10);
         zi = ahead + scroll;
         st.z[i] = zi;
@@ -184,11 +195,23 @@ function PineForestInstanced({ uris }: InstancedProps) {
       const surfaceY = GROUND_SURFACE_Y + bend - TREE_SINK_DEPTH * 0.35 - SPRITE_GROUND_SINK;
 
       const worldZ = z - scroll;
-      const dx = camera.position.x - x;
-      const dz = camera.position.z - worldZ;
+      const dx = camX - x;
+      const dz = camZ - worldZ;
       const yaw = Math.atan2(dx, dz);
-      euler.set(0, yaw, 0);
-      quat.setFromEuler(euler);
+
+      const phase = i * 0.71 + x * 1.25 + z * 0.19;
+      const lean =
+        Math.sin(t * 1.22 + phase) * 0.55 * TREE_SWAY_LEAN_AMP +
+        Math.sin(t * 2.35 + phase * 0.73) * 0.45 * TREE_SWAY_LEAN_AMP;
+      const roll =
+        Math.sin(t * 1.08 + phase * 1.15) * 0.65 * TREE_SWAY_ROLL_AMP +
+        Math.sin(t * 2.1 - z * 0.4) * 0.45 * TREE_SWAY_ROLL_AMP;
+
+      quat.setFromAxisAngle(yAxis, yaw);
+      swayQX.setFromAxisAngle(xAxis, lean);
+      quat.multiply(swayQX);
+      swayQZ.setFromAxisAngle(zAxis, roll);
+      quat.multiply(swayQZ);
 
       const sm = scaleMuls[i]!;
       scaleV.set(sm, sm, sm);
