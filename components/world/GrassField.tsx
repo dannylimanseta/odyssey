@@ -6,6 +6,8 @@ import {
   Color,
   DoubleSide,
   InstancedMesh,
+  LinearFilter,
+  LinearMipmapLinearFilter,
   Matrix4,
   PlaneGeometry,
   Quaternion,
@@ -22,7 +24,7 @@ import { palette } from './palette';
 import { useWorldScrollRef } from './ScrollContext';
 
 /** Blade count scales with lawn area (see GRASS_X_SPREAD_MUL). */
-const GRASS_COUNT = 5000;
+const GRASS_COUNT = 7000;
 /** Plane width before instance scale; world width = this × scaleXZ. */
 const BLADE_WIDTH = 0.05;
 /** Sprite height in world units (width follows plane aspect). */
@@ -84,11 +86,15 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
   useLayoutEffect(() => {
     grassMap.colorSpace = SRGBColorSpace;
     grassMap.flipY = true;
+    grassMap.generateMipmaps = true;
+    grassMap.minFilter = LinearMipmapLinearFilter;
+    grassMap.magFilter = LinearFilter;
     grassMap.needsUpdate = true;
   }, [grassMap]);
 
   const geometry = useMemo(() => {
-    const g = new PlaneGeometry(BLADE_WIDTH, BLADE_HEIGHT, 1, 4);
+    /** 1×2 segments → 6 verts/blade (was 1×4 → 10); enough for height-weighted sway. */
+    const g = new PlaneGeometry(BLADE_WIDTH, BLADE_HEIGHT, 1, 2);
     g.translate(0, BLADE_HEIGHT * 0.5, 0);
     return g;
   }, []);
