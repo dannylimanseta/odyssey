@@ -23,7 +23,9 @@ void main() {
   vec3 c = mix(bottomColor, horizonColor, smoothstep(0.0, 0.42, t));
   c = mix(c, midColor, smoothstep(0.38, 0.68, t));
   c = mix(c, topColor, smoothstep(0.62, 1.0, t));
-  gl_FragColor = vec4(c, 1.0);
+  /* Softer overlay: show distant bg at bottom; pastel band mid/upper only. */
+  float a = smoothstep(0.06, 0.22, t) * (1.0 - smoothstep(0.52, 0.9, t)) * 0.52;
+  gl_FragColor = vec4(c, a);
 }
 `;
 
@@ -41,6 +43,7 @@ export function HorizonSky() {
       vertexShader,
       fragmentShader,
       side: DoubleSide,
+      transparent: true,
       depthWrite: false,
     });
     return { geometry: g, material: m };

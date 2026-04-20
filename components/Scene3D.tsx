@@ -19,6 +19,7 @@ import travelerModel from '../assets/models/traveler_1.glb';
 import { BlobShadow } from './world/BlobShadow';
 import { CurvedGround } from './world/CurvedGround';
 import { GrassField } from './world/GrassField';
+import { DistantBgSky } from './world/DistantBgSky';
 import { HorizonSky } from './world/HorizonSky';
 import { palette } from './world/palette';
 import { PineForest } from './world/PineForest';
@@ -151,10 +152,11 @@ function SunShadowLight() {
      */
     cam.near = 0.4;
     cam.far = 40;
-    cam.left = -6;
-    cam.right = 6;
-    cam.top = 8;
-    cam.bottom = -6;
+    /** Ortho frustum in the light’s view; traveler stays near origin while the path runs −Z. */
+    cam.left = -7;
+    cam.right = 7;
+    cam.top = 9;
+    cam.bottom = -7;
     /**
      * Hero sits ~6cm above the ground. A strong negative bias pushes that
      * contact shadow off the surface entirely; rely on normalBias for acne.
@@ -168,7 +170,7 @@ function SunShadowLight() {
     <directionalLight
       ref={ref}
       castShadow
-      position={[6, 10, 5]}
+      position={[1.2, 11, -9]}
       intensity={1.45}
       color="#fff8f3"
     />
@@ -202,6 +204,7 @@ export function Scene3D({ steps }: { steps: number }) {
           <SunShadowLight />
           <directionalLight position={[-5.5, 4.2, -7.5]} intensity={0.3} color="#bfd6ff" />
 
+          <DistantBgSky />
           <HorizonSky />
 
           <WorldScrollRoot steps={steps}>

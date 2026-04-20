@@ -25,6 +25,7 @@ import {
   GROUND_WIDTH,
   groundBendY,
   TREE_COUNT,
+  TREE_MIN_SEPARATION,
   TREE_PATH_EXCLUSION_HALF_WIDTH,
   TREE_RECYCLE_Z,
   TREE_SINK_DEPTH,
@@ -45,6 +46,9 @@ const SPRITE_GROUND_SINK = 0.09;
 const TREE_SWAY_LEAN_AMP = 0.065;
 const TREE_SWAY_ROLL_AMP = 0.026;
 
+const TREE_MIN_SEP_SQ = TREE_MIN_SEPARATION * TREE_MIN_SEPARATION;
+const TREE_PLACE_MAX_ATTEMPTS = 32;
+
 function randomInRange(seed: number, lo: number, hi: number) {
   const x = Math.sin(seed * 127.1) * 43758.5453;
   return lo + (x - Math.floor(x)) * (hi - lo);
@@ -61,6 +65,32 @@ function randomTreeX(seed: number, xSpread: number, exclusionHalfWidth: number, 
     return randomInRange(seed * 2.47, leftLo, leftHi);
   }
   return randomInRange(seed * 4.11, rightLo, rightHi);
+}
+
+function tooCloseToPlaced(x: number, z: number, placedCount: number, xs: Float32Array, zs: Float32Array) {
+  for (let j = 0; j < placedCount; j++) {
+    const dx = xs[j]! - x;
+    const dz = zs[j]! - z;
+    if (dx * dx + dz * dz < TREE_MIN_SEP_SQ) return true;
+  }
+  return false;
+}
+
+function tooCloseToOthers(
+  x: number,
+  z: number,
+  excludeIndex: number,
+  xs: Float32Array,
+  zs: Float32Array,
+  n: number,
+) {
+  for (let j = 0; j < n; j++) {
+    if (j === excludeIndex) continue;
+    const dx = xs[j]! - x;
+    const dz = zs[j]! - z;
+    if (dx * dx + dz * dz < TREE_MIN_SEP_SQ) return true;
+  }
+  return false;
 }
 
 async function resolveSpriteUris(): Promise<string[]> {
@@ -165,8 +195,21 @@ function PineForestInstanced({ uris }: InstancedProps) {
     st.initialized = true;
     for (let i = 0; i < TREE_COUNT; i++) {
       const onLeft = (i & 1) === 0;
-      st.x[i] = randomTreeX(i * 1.71, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH, onLeft);
-      st.z[i] = TREE_SPAWN_Z + randomInRange(i * 3.31, 2, 22);
+      let placed = false;
+      for (let attempt = 0; attempt < TREE_PLACE_MAX_ATTEMPTS; attempt++) {
+        const x = randomTreeX(i * 1.71 + attempt * 9.31, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH, onLeft);
+        const z = TREE_SPAWN_Z + randomInRange(i * 3.31 + attempt * 6.17, 2, 24);
+        if (!tooCloseToPlaced(x, z, i, st.x, st.z)) {
+          st.x[i] = x;
+          st.z[i] = z;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        st.x[i] = randomTreeX(i * 1.71, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH, onLeft);
+        st.z[i] = TREE_SPAWN_Z + 2 + (i % 19) * 1.05;
+      }
     }
   };
 
@@ -182,10 +225,26 @@ function PineForestInstanced({ uris }: InstancedProps) {
       let zi = st.z[i];
       if (-scroll + zi > TREE_RECYCLE_Z) {
         const onLeft = (i & 1) === 0;
-        st.x[i] = randomTreeX(scroll + i * 7.1, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH, onLeft);
-        const ahead = TREE_SPAWN_Z + randomInRange(scroll + i * 2.9, 0, 10);
-        zi = ahead + scroll;
-        st.z[i] = zi;
+        let placed = false;
+        for (let attempt = 0; attempt < TREE_PLACE_MAX_ATTEMPTS; attempt++) {
+          const x = randomTreeX(scroll + i * 7.1 + attempt * 11.4, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH, onLeft);
+          const zSpan = 10 + attempt * 0.35;
+          const ahead = TREE_SPAWN_Z + randomInRange(scroll + i * 2.9 + attempt * 8.21, 0, zSpan);
+          const zNew = ahead + scroll;
+          if (!tooCloseToOthers(x, zNew, i, st.x, st.z, TREE_COUNT)) {
+            st.x[i] = x;
+            zi = zNew;
+            st.z[i] = zi;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          st.x[i] = randomTreeX(scroll + i * 7.1, xSpread, TREE_PATH_EXCLUSION_HALF_WIDTH, onLeft);
+          const ahead = TREE_SPAWN_Z + randomInRange(scroll + i * 2.9, 0, 10) + (i % 7) * TREE_MIN_SEPARATION * 0.45;
+          zi = ahead + scroll;
+          st.z[i] = zi;
+        }
       }
 
       const x = st.x[i];

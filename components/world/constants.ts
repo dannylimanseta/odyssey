@@ -41,6 +41,8 @@ export const TREE_RECYCLE_Z = 4;
 /** Respawn trees this far ahead (local -Z in env group). */
 export const TREE_SPAWN_Z = -32;
 export const TREE_COUNT = 72;
+/** Minimum center distance between tree billboards (XZ) to reduce overlap / z-fighting. */
+export const TREE_MIN_SEPARATION = 1.55;
 /**
  * Lateral half-width of the cleared strip along the path (world X).
  * Trees spawn only outside [-TREE_PATH_EXCLUSION_HALF_WIDTH, +…] so the traveler stays visible.
