@@ -17,18 +17,12 @@ import {
 
 import grassImg from '../../assets/sprites/grass_1.png';
 
-import {
-  GROUND_CURVE_RADIUS,
-  GROUND_SURFACE_Y,
-  GROUND_WIDTH,
-  TREE_RECYCLE_Z,
-  TREE_SPAWN_Z,
-} from './constants';
+import { GROUND_CURVE_RADIUS, GROUND_SURFACE_Y, GROUND_WIDTH, TREE_RECYCLE_Z } from './constants';
 import { palette } from './palette';
 import { useWorldScrollRef } from './ScrollContext';
 
 /** Blade count scales with lawn area (see GRASS_X_SPREAD_MUL). */
-const GRASS_COUNT = 10_000;
+const GRASS_COUNT = 5000;
 /** Plane width before instance scale; world width = this × scaleXZ. */
 const BLADE_WIDTH = 0.05;
 /** Sprite height in world units (width follows plane aspect). */
@@ -44,6 +38,14 @@ const GRASS_SCALE_XZ_MAX = GRASS_WIDTH_MAX / BLADE_WIDTH;
 const GRASS_X_SPREAD_MUL = 0.47;
 /** Sink blade bases slightly so sprites tuck into the turf (world Y). */
 const GRASS_Y_SINK = 0.04;
+/**
+ * Local Z (ScrollingEnvironment space): near / far along the path.
+ * Previously matched trees (~-31.5…3); grass is capped closer since fog hides the far band.
+ */
+const GRASS_LOCAL_Z_MAX = 0;
+const GRASS_LOCAL_Z_MIN = -10;
+/** Recycled blades respawn in a strip starting at this offset from `GRASS_LOCAL_Z_MIN + scroll`. */
+const GRASS_RECYCLE_SPAWN_DEPTH = 4;
 
 function hash(seed: number) {
   const x = Math.sin(seed * 127.1) * 43758.5453;
@@ -200,11 +202,8 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
     const st = state.current;
     if (st.initialized) return;
     st.initialized = true;
-    const zSpan = -TREE_SPAWN_Z + TREE_RECYCLE_Z - 1;
-    const zMin = TREE_SPAWN_Z + 0.5;
-    const zMax = TREE_SPAWN_Z + zSpan;
     for (let i = 0; i < GRASS_COUNT; i++) {
-      const { x, z } = pickUniformXZ(i * 2.17 + 1.3, xSpread, zMin, zMax);
+      const { x, z } = pickUniformXZ(i * 2.17 + 1.3, xSpread, GRASS_LOCAL_Z_MIN, GRASS_LOCAL_Z_MAX);
       st.x[i] = x;
       st.z[i] = z;
       st.scaleXZ[i] = rnd(i * 4.43 + 2.1, GRASS_SCALE_XZ_MIN, GRASS_SCALE_XZ_MAX);
@@ -232,8 +231,8 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
 
     for (let i = 0; i < GRASS_COUNT; i++) {
       if (-scroll + st.z[i]! > TREE_RECYCLE_Z) {
-        const zLo = TREE_SPAWN_Z + scroll;
-        const zHi = zLo + 10;
+        const zLo = GRASS_LOCAL_Z_MIN + scroll;
+        const zHi = zLo + GRASS_RECYCLE_SPAWN_DEPTH;
         const { x, z } = pickUniformXZ(scroll + i * 5.73, xSpread, zLo, zHi);
         st.x[i] = x;
         st.z[i] = z;
