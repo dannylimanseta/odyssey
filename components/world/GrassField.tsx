@@ -1,5 +1,7 @@
+import { useTexture } from '@react-three/drei/native';
 import { useFrame } from '@react-three/fiber/native';
-import { useMemo, useRef } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Asset } from 'expo-asset';
 import {
   Color,
   DoubleSide,
@@ -8,8 +10,12 @@ import {
   PlaneGeometry,
   Quaternion,
   ShaderMaterial,
+  SRGBColorSpace,
+  Texture,
   Vector3,
 } from 'three';
+
+import grassImg from '../../assets/sprites/grass_1.png';
 
 import {
   GROUND_CURVE_RADIUS,
@@ -21,13 +27,16 @@ import {
 import { palette } from './palette';
 import { useWorldScrollRef } from './ScrollContext';
 
-/** Ten-fold denser field — tuned with the base-alpha fade so overdraw is bounded. */
-const GRASS_COUNT = 150000;
+/** Fewer blades + patch mask → clumpy turf, not a solid carpet. */
+const GRASS_COUNT = 6000;
 const BLADE_WIDTH = 0.05;
-/** Half height — shorter stubbier blades read as turf, not meadow. */
-const BLADE_HEIGHT = 0.07;
+/** Sprite height in world units (width follows plane aspect). */
+const BLADE_HEIGHT = 0.1;
 /** Narrow strip kept clear of blades so the path still reads. */
-const GRASS_PATH_CLEAR_HALF = 0.26;
+const GRASS_PATH_CLEAR_HALF = 0.0;
+const GRASS_X_SPREAD_MUL = 0.1;
+const PATCH_ACCEPT = 0.44;
+const PATCH_ATTEMPTS = 14;
 
 function hash(seed: number) {
   const x = Math.sin(seed * 127.1) * 43758.5453;
@@ -43,26 +52,65 @@ function rndX(seed: number, xSpread: number, clearHalf: number) {
   return rnd(seed * 4.11, gap, xSpread);
 }
 
+function patchMask(worldX: number, worldZ: number): number {
+  const n1 = 0.5 + 0.5 * Math.sin(worldX * 1.05 + worldZ * 0.38);
+  const n2 = 0.5 + 0.5 * Math.sin(worldX * 0.39 - worldZ * 0.71);
+  const n3 = 0.5 + 0.5 * Math.cos(worldX * 0.21 + worldZ * 0.27);
+  return n1 * n2 * 0.52 + n3 * 0.48;
+}
+
+function pickPatchyXZ(
+  seed: number,
+  scroll: number,
+  xSpread: number,
+  zMin: number,
+  zMax: number,
+): { x: number; z: number } {
+  let bestX = 0;
+  let bestZ = zMin;
+  let bestScore = -1;
+  for (let t = 0; t < PATCH_ATTEMPTS; t++) {
+    const s = seed + t * 31.71;
+    const x = rndX(s, xSpread, GRASS_PATH_CLEAR_HALF);
+    const z = zMin + rnd(s * 2.13 + t, 0, zMax - zMin);
+    const worldZ = z - scroll;
+    const score = patchMask(x, worldZ);
+    if (score > bestScore) {
+      bestScore = score;
+      bestX = x;
+      bestZ = z;
+    }
+    if (score >= PATCH_ACCEPT) return { x, z };
+  }
+  return { x: bestX, z: bestZ };
+}
+
+async function resolveGrassUri(): Promise<string> {
+  const asset = Asset.fromModule(grassImg);
+  await asset.downloadAsync();
+  return asset.localUri ?? asset.uri;
+}
+
+type GrassFieldWithMapProps = { uri: string };
+
 /**
- * Instanced shader grass. One draw call for all blades. Silhouette (rounded
- * base, pointy-but-rounded tip) is rendered via fragment alpha on a simple
- * plane so every blade corner reads as a curve, not a sharp rectangle edge.
- *
- * Design goals:
- *  - Base color matches the ground → blades dissolve into the lawn seamlessly.
- *  - Alpha at the bottom fades to 0 → no visible contact seam.
- *  - Wind sway is world-space coherent (gusts ripple across the field).
- *  - Recycle pattern mirrors `PineForest` for predictable density as you walk.
+ * Textured grass blade (`grass_1.png`): same instancing, wind, and ground curve;
+ * fragment samples the sprite instead of a procedural silhouette.
  */
-export function GrassField() {
+function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
   const scrollRef = useWorldScrollRef();
   const meshRef = useRef<InstancedMesh>(null);
 
+  const textureUrls = useMemo(() => [uri], [uri]);
+  const [grassMap] = useTexture(textureUrls) as [Texture];
+
+  useLayoutEffect(() => {
+    grassMap.colorSpace = SRGBColorSpace;
+    grassMap.flipY = true;
+    grassMap.needsUpdate = true;
+  }, [grassMap]);
+
   const geometry = useMemo(() => {
-    /**
-     * Height-segmented plane so the shader can bend the blade smoothly.
-     * Translated so the blade base sits at y = 0 (pivot on the ground).
-     */
     const g = new PlaneGeometry(BLADE_WIDTH, BLADE_HEIGHT, 1, 4);
     g.translate(0, BLADE_HEIGHT * 0.5, 0);
     return g;
@@ -72,22 +120,13 @@ export function GrassField() {
     const m = new ShaderMaterial({
       side: DoubleSide,
       transparent: true,
-      /**
-       * Keep depth writes so dense blades still resolve roughly front-to-back
-       * against the ground + trees. Fragment shader discards low-alpha pixels
-       * to avoid soft-edge z-fighting when many blades overlap.
-       */
       depthWrite: true,
       depthTest: true,
       uniforms: {
+        uMap: { value: grassMap },
         uTime: { value: 0 },
-        /** Pure X-axis sway so blades lean left↔right from the camera's POV. */
         uWindDir: { value: new Vector3(1.0, 0.0, 0.0) },
-        /** Stronger breeze — tips travel visibly further while bases stay glued. */
-        uWindAmp: { value: 0.11 },
-        uBaseColor: { value: new Color(palette.grassBase) },
-        uTipColor: { value: new Color(palette.grassTip) },
-        uHighlight: { value: new Color(palette.rim) },
+        uWindAmp: { value: 0.2 },
         uFogColor: { value: new Color(palette.fog) },
         uFogNear: { value: 6.0 },
         uFogFar: { value: 36.0 },
@@ -101,9 +140,8 @@ export function GrassField() {
         uniform float uCurveRadius;
         uniform float uBladeHeight;
 
-        varying float vHeight;
-        varying float vViewZ;
         varying vec2 vUv;
+        varying float vViewZ;
 
         void main() {
           vUv = uv;
@@ -111,20 +149,22 @@ export function GrassField() {
           vec4 instPos = instanceMatrix * vec4( position, 1.0 );
 
           float h = clamp( instPos.y / uBladeHeight, 0.0, 1.0 );
-          vHeight = h;
 
           vec4 worldPos = modelMatrix * instPos;
 
-          // Tri-frequency wind sway, world-space coherent; larger primary swing.
           float phase = worldPos.x * 1.4 + worldPos.z * 0.9;
-          float sway = sin( uTime * 1.55 + phase ) * 0.85
-                     + sin( uTime * 2.70 + phase * 0.7 ) * 0.4
-                     + sin( uTime * 0.75 + phase * 1.9 ) * 0.22;
-          /** Slightly gentler height exponent → middle of the blade also moves, not just the tip. */
-          float swayAmp = uWindAmp * pow( h, 1.2 );
-          worldPos.xyz += uWindDir * sway * swayAmp;
+          float gust = sin( uTime * 1.55 + phase ) * 0.72
+                     + sin( uTime * 2.70 + phase * 0.7 ) * 0.38
+                     + sin( uTime * 0.75 + phase * 1.9 ) * 0.2;
+          float flutter = sin( uTime * 3.4 + phase * 2.1 + worldPos.x * 3.2 ) * 0.35;
+          vec3 windN = normalize( uWindDir );
+          vec3 crossWind = normalize( cross( vec3( 0.0, 1.0, 0.0 ), windN ) );
+          float swayXZ = gust + flutter;
+          float swayCross = sin( uTime * 1.9 + phase * 1.15 ) * 0.55
+                          + sin( uTime * 2.8 - phase * 0.85 ) * 0.28;
+          float swayAmp = uWindAmp * pow( h, 1.65 );
+          worldPos.xyz += ( windN * swayXZ + crossWind * swayCross ) * swayAmp;
 
-          // Ground curve: parabolic horizon −z²/(2R) matches CurvedGround.
           worldPos.y += -( worldPos.z * worldPos.z ) / ( 2.0 * uCurveRadius );
 
           vec4 mv = viewMatrix * worldPos;
@@ -135,42 +175,23 @@ export function GrassField() {
       fragmentShader: /* glsl */ `
         precision mediump float;
 
-        uniform vec3 uBaseColor;
-        uniform vec3 uTipColor;
-        uniform vec3 uHighlight;
+        uniform sampler2D uMap;
         uniform vec3 uFogColor;
         uniform float uFogNear;
         uniform float uFogFar;
 
-        varying float vHeight;
-        varying float vViewZ;
         varying vec2 vUv;
+        varying float vViewZ;
 
         void main() {
-          float h = vUv.y;
-          float cx = vUv.x - 0.5;
+          vec4 tex = texture2D( uMap, vUv );
 
-          // Blade silhouette as an alpha mask: widest at base, smoothly narrows
-          // through a main taper, then a quarter-circle style cap that rounds
-          // the tip so the top of each blade reads as a curve (zero slope at h=1).
-          float mainTaper = 1.0 - pow( h, 1.15 );
-          float tipCap = 1.0 - smoothstep( 0.62, 1.0, h );
-          float width = 0.5 * mainTaper * tipCap;
-          float dx = abs( cx );
-          float sil = 1.0 - smoothstep( max( width - 0.035, 0.0 ), width + 0.002, dx );
-
-          // Bottom of the blade fades to fully transparent so the base
-          // dissolves into the ground instead of leaving a hard contact line.
-          float bottomFade = smoothstep( 0.0, 0.24, h );
-
-          float alpha = sil * bottomFade;
+          float bottomFade = smoothstep( 0.0, 0.22, vUv.y );
+          float alpha = tex.a * bottomFade;
           if ( alpha < 0.03 ) discard;
 
-          // Vertical color gradient. Base tracks the ground; tip a touch brighter.
-          vec3 col = mix( uBaseColor, uTipColor, pow( h, 0.9 ) );
-          col += uHighlight * 0.05 * pow( h, 6.0 );
+          vec3 col = tex.rgb;
 
-          // Distance soften — match scene fog so far grass blends out.
           float t = smoothstep( uFogNear, uFogFar, vViewZ );
           float lum = dot( col, vec3( 0.299, 0.587, 0.114 ) );
           col = mix( col, vec3( lum ), t * 0.4 );
@@ -181,7 +202,7 @@ export function GrassField() {
       `,
     });
     return m;
-  }, []);
+  }, [grassMap]);
 
   const state = useRef({
     x: new Float32Array(GRASS_COUNT),
@@ -198,7 +219,7 @@ export function GrassField() {
   const scaleV = useMemo(() => new Vector3(), []);
   const yAxis = useMemo(() => new Vector3(0, 1, 0), []);
 
-  const xSpread = GROUND_WIDTH * 0.5;
+  const xSpread = GROUND_WIDTH * GRASS_X_SPREAD_MUL;
 
   const writeInstance = (i: number, mesh: InstancedMesh) => {
     const st = state.current;
@@ -213,13 +234,16 @@ export function GrassField() {
     const st = state.current;
     if (st.initialized) return;
     st.initialized = true;
-    const zRange = -TREE_SPAWN_Z + TREE_RECYCLE_Z - 1;
+    const zSpan = -TREE_SPAWN_Z + TREE_RECYCLE_Z - 1;
+    const zMin = TREE_SPAWN_Z + 0.5;
+    const zMax = TREE_SPAWN_Z + zSpan;
     for (let i = 0; i < GRASS_COUNT; i++) {
-      st.x[i] = rndX(i * 2.17 + 1.3, xSpread, GRASS_PATH_CLEAR_HALF);
-      st.z[i] = TREE_SPAWN_Z + rnd(i * 3.11 + 0.5, 0.5, zRange);
+      const { x, z } = pickPatchyXZ(i * 2.17 + 1.3, 0, xSpread, zMin, zMax);
+      st.x[i] = x;
+      st.z[i] = z;
       st.rotY[i] = rnd(i * 7.19, 0, Math.PI);
-      st.scaleXZ[i] = rnd(i * 4.43 + 2.1, 0.8, 1.3);
-      st.scaleY[i] = rnd(i * 5.87 + 3.2, 0.85, 1.55);
+      st.scaleXZ[i] = rnd(i * 4.43 + 2.1, 0.72, 1.22);
+      st.scaleY[i] = rnd(i * 5.87 + 3.2, 0.78, 1.45);
       writeInstance(i, mesh);
     }
     mesh.instanceMatrix.needsUpdate = true;
@@ -230,7 +254,6 @@ export function GrassField() {
     if (!mesh) return;
     initLayout(mesh);
 
-    /** Clamp dt so tab-switches don't teleport the phase. */
     const delta = Math.min(dt, 0.1);
     material.uniforms.uTime.value += delta;
 
@@ -239,12 +262,14 @@ export function GrassField() {
     let recycled = 0;
     for (let i = 0; i < GRASS_COUNT; i++) {
       if (-scroll + st.z[i]! > TREE_RECYCLE_Z) {
-        st.x[i] = rndX(scroll + i * 5.73, xSpread, GRASS_PATH_CLEAR_HALF);
-        const ahead = TREE_SPAWN_Z + rnd(scroll + i * 1.91, 0, 8);
-        st.z[i] = ahead + scroll;
+        const zLo = TREE_SPAWN_Z + scroll;
+        const zHi = zLo + 10;
+        const { x, z } = pickPatchyXZ(scroll + i * 5.73, scroll, xSpread, zLo, zHi);
+        st.x[i] = x;
+        st.z[i] = z;
         st.rotY[i] = rnd(scroll + i * 11.31, 0, Math.PI);
-        st.scaleXZ[i] = rnd(scroll + i * 3.17 + 0.4, 0.8, 1.3);
-        st.scaleY[i] = rnd(scroll + i * 2.71 + 0.9, 0.85, 1.55);
+        st.scaleXZ[i] = rnd(scroll + i * 3.17 + 0.4, 0.72, 1.22);
+        st.scaleY[i] = rnd(scroll + i * 2.71 + 0.9, 0.78, 1.45);
         writeInstance(i, mesh);
         recycled++;
       }
@@ -254,11 +279,38 @@ export function GrassField() {
 
   return (
     <instancedMesh
+      key={grassMap.uuid}
       ref={meshRef}
       args={[geometry, material, GRASS_COUNT]}
       frustumCulled={false}
       castShadow={false}
       receiveShadow={false}
     />
+  );
+}
+
+export function GrassField() {
+  const [uri, setUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    resolveGrassUri()
+      .then((u) => {
+        if (!cancelled) setUri(u);
+      })
+      .catch(() => {
+        if (!cancelled) setUri(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!uri) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <GrassFieldWithMap uri={uri} />
+    </Suspense>
   );
 }

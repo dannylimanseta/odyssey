@@ -23,7 +23,6 @@ import { HorizonSky } from './world/HorizonSky';
 import { palette } from './world/palette';
 import { PineForest } from './world/PineForest';
 import { applyDistanceDefocus } from './world/distanceDefocusMaterial';
-import { applyRimHighlight } from './world/rimMaterial';
 import { ScrollingEnvironment, WorldScrollRoot } from './world/ScrollingEnvironment';
 import { GROUND_SURFACE_Y, TRAVELER_FOOT_CLEARANCE } from './world/constants';
 
@@ -85,7 +84,6 @@ function Traveler({ uri }: TravelerProps) {
   const { actions } = useAnimations(animations, groupRef);
 
   useLayoutEffect(() => {
-    const rim = new Color(palette.rim);
     scene.traverse((child) => {
       if (!(child instanceof Mesh)) return;
       child.castShadow = true;
@@ -111,7 +109,6 @@ function Traveler({ uri }: TravelerProps) {
         }
         if (mat instanceof MeshStandardMaterial || mat instanceof MeshPhysicalMaterial) {
           applyDistanceDefocus(mat, { hazeColor: new Color(palette.fog), near: 4, far: 28, strength: 0.55 });
-          applyRimHighlight(mat, rim, 0.26);
         }
       }
     });

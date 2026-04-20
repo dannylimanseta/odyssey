@@ -6,7 +6,7 @@ export const palette = {
   skyWarm: '#f5c9d4',
   hill: '#9db8a8',
   hillDark: '#7a9b8f',
-  ground: '#00B052',
+  ground: '#88AB65',
   fog: '#c8dde8',
   pine: '#6eb899',
   pineVariant: '#5aa88a',
@@ -17,6 +17,4 @@ export const palette = {
    */
   grassBase: '#c4d39f',
   grassTip: '#dae3b6',
-  /** Warm yellow rim on lit edges (Lambert / Standard patch). */
-  rim: '#ffd080',
 } as const;

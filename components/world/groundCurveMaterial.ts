@@ -10,7 +10,7 @@ export type GroundCurveUniforms = {
  * Stable horizon parabola: y -= vertexWorldZ² / (2R) with the crest always under the camera.
  * The ground mesh stays world-anchored at z = 0 (see CurvedGround), so transformed.z
  * equals the vertex's world Z. No scroll input → hill does not drift as the player walks.
- * Chains with any prior onBeforeCompile (e.g. rim highlight).
+ * Chains with any prior onBeforeCompile patch on the same material.
  */
 export function applyGroundCurveBend(material: MeshLambertMaterial, radius = GROUND_CURVE_RADIUS) {
   const uniforms: GroundCurveUniforms = {

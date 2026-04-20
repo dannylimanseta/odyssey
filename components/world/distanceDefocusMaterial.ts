@@ -27,8 +27,6 @@ export type DistanceDefocusOptions = {
  * tiny high-frequency hash so far silhouettes read softer without a full-screen
  * blur pass (mobile-friendly). Runs before `#include <opaque_fragment>` so it
  * composes with scene fog in `fog_fragment`.
- *
- * Register **before** `applyRimHighlight` so rim still wraps the inner include.
  */
 export function applyDistanceDefocus(
   material: PatchableMaterial,
