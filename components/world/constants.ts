@@ -19,6 +19,12 @@ export const GROUND_THETA = 0.42;
  * Smaller R = more dramatic fall-off toward the horizon.
  */
 export const GROUND_CURVE_RADIUS = 38;
+/**
+ * Scene linear fog (`scene.fog`) and custom grass fog — shared distances so
+ * distant props tint together. Lower `far` = full fog color sooner.
+ */
+export const SCENE_FOG_NEAR = 5;
+export const SCENE_FOG_FAR = 26;
 /** Base Y of the ground mesh inside the scrolling group (matches trees + bend). */
 export const GROUND_SURFACE_Y = -0.34;
 /**

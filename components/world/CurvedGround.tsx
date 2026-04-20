@@ -3,7 +3,14 @@ import { useMemo, useRef } from 'react';
 import { Color, DoubleSide, MeshLambertMaterial, PlaneGeometry } from 'three';
 import type { Mesh } from 'three';
 
-import { GROUND_CURVE_RADIUS, GROUND_DEPTH, GROUND_SURFACE_Y, GROUND_WIDTH } from './constants';
+import {
+  GROUND_CURVE_RADIUS,
+  GROUND_DEPTH,
+  GROUND_SURFACE_Y,
+  GROUND_WIDTH,
+  SCENE_FOG_FAR,
+  SCENE_FOG_NEAR,
+} from './constants';
 import { applyDistanceDefocus } from './distanceDefocusMaterial';
 import { applyGroundCurveBend } from './groundCurveMaterial';
 import { palette } from './palette';
@@ -29,7 +36,12 @@ export function CurvedGround() {
       depthTest: true,
     });
     applyGroundCurveBend(m, GROUND_CURVE_RADIUS);
-    applyDistanceDefocus(m, { hazeColor: new Color(palette.fog), near: 5, far: 36 });
+    applyDistanceDefocus(m, {
+      hazeColor: new Color(palette.fog),
+      near: SCENE_FOG_NEAR,
+      far: SCENE_FOG_FAR,
+      strength: 0.85,
+    });
 
     return { geometry: g, material: m };
   }, []);

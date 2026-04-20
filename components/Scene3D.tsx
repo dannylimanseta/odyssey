@@ -25,7 +25,7 @@ import { palette } from './world/palette';
 import { PineForest } from './world/PineForest';
 import { applyDistanceDefocus } from './world/distanceDefocusMaterial';
 import { ScrollingEnvironment, WorldScrollRoot } from './world/ScrollingEnvironment';
-import { GROUND_SURFACE_Y, TRAVELER_FOOT_CLEARANCE } from './world/constants';
+import { GROUND_SURFACE_Y, SCENE_FOG_FAR, SCENE_FOG_NEAR, TRAVELER_FOOT_CLEARANCE } from './world/constants';
 
 /** Hero scale. Kept intentionally small so more of the path/sky reads in frame. */
 const DISPLAY_SCALE = 1.35 * 0.252;
@@ -193,7 +193,7 @@ export function Scene3D({ steps }: { steps: number }) {
           gl={{ antialias: true }}
           onCreated={({ scene, gl, camera }) => {
             scene.background = new Color(palette.skyTop);
-            scene.fog = new Fog(new Color(palette.fog), 5, 46);
+            scene.fog = new Fog(new Color(palette.fog), SCENE_FOG_NEAR, SCENE_FOG_FAR);
             gl.shadowMap.enabled = true;
             gl.shadowMap.type = PCFSoftShadowMap;
             camera.lookAt(0, VIEW_LOOK_Y, VIEW_LOOK_Z);

@@ -19,12 +19,19 @@ import {
 
 import grassImg from '../../assets/sprites/grass_1.png';
 
-import { GROUND_CURVE_RADIUS, GROUND_SURFACE_Y, GROUND_WIDTH, TREE_RECYCLE_Z } from './constants';
+import {
+  GROUND_CURVE_RADIUS,
+  GROUND_SURFACE_Y,
+  GROUND_WIDTH,
+  SCENE_FOG_FAR,
+  SCENE_FOG_NEAR,
+  TREE_RECYCLE_Z,
+} from './constants';
 import { palette } from './palette';
 import { useWorldScrollRef } from './ScrollContext';
 
 /** Blade count scales with lawn area (see GRASS_X_SPREAD_MUL). */
-const GRASS_COUNT = 10000;
+const GRASS_COUNT = 20000;
 /** Plane width before instance scale; world width = this × scaleXZ. */
 const BLADE_WIDTH = 0.05;
 /** Sprite height in world units (width follows plane aspect). */
@@ -112,8 +119,8 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
         uWindDir: { value: new Vector3(1.0, 0.0, 0.0) },
         uWindAmp: { value: 0.02},
         uFogColor: { value: new Color(palette.fog) },
-        uFogNear: { value: 6.0 },
-        uFogFar: { value: 36.0 },
+        uFogNear: { value: SCENE_FOG_NEAR },
+        uFogFar: { value: SCENE_FOG_FAR },
         uCurveRadius: { value: GROUND_CURVE_RADIUS },
         uBladeHeight: { value: BLADE_HEIGHT },
       },
@@ -191,8 +198,8 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
 
           float t = smoothstep( uFogNear, uFogFar, vViewZ );
           float lum = dot( col, vec3( 0.299, 0.587, 0.114 ) );
-          col = mix( col, vec3( lum ), t * 0.4 );
-          col = mix( col, uFogColor, t * 0.55 );
+          col = mix( col, vec3( lum ), t * 0.62 );
+          col = mix( col, uFogColor, t * 0.92 );
 
           gl_FragColor = vec4( col, alpha );
         }
