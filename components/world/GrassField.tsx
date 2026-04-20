@@ -1,5 +1,5 @@
 import { useTexture } from '@react-three/drei/native';
-import { useFrame } from '@react-three/fiber/native';
+import { useFrame, useThree } from '@react-three/fiber/native';
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Asset } from 'expo-asset';
 import {
@@ -27,16 +27,23 @@ import {
 import { palette } from './palette';
 import { useWorldScrollRef } from './ScrollContext';
 
-/** Fewer blades + patch mask → clumpy turf, not a solid carpet. */
-const GRASS_COUNT = 6000;
+/** Blade count scales with lawn area (see GRASS_X_SPREAD_MUL). */
+const GRASS_COUNT = 10_000;
+/** Plane width before instance scale; world width = this × scaleXZ. */
 const BLADE_WIDTH = 0.05;
 /** Sprite height in world units (width follows plane aspect). */
 const BLADE_HEIGHT = 0.1;
-/** Narrow strip kept clear of blades so the path still reads. */
-const GRASS_PATH_CLEAR_HALF = 0.0;
-const GRASS_X_SPREAD_MUL = 0.1;
-const PATCH_ACCEPT = 0.44;
-const PATCH_ATTEMPTS = 14;
+/** Target world thickness (X) after scale: `BLADE_WIDTH * scaleXZ`. */
+const GRASS_WIDTH_MIN = 0.04;
+const GRASS_WIDTH_MAX = 0.05;
+const GRASS_SCALE_XZ_MIN = GRASS_WIDTH_MIN / BLADE_WIDTH;
+const GRASS_SCALE_XZ_MAX = GRASS_WIDTH_MAX / BLADE_WIDTH;
+/**
+ * Lateral half-width as a fraction of `GROUND_WIDTH` (mesh is centered; stay inside the quad).
+ */
+const GRASS_X_SPREAD_MUL = 0.47;
+/** Sink blade bases slightly so sprites tuck into the turf (world Y). */
+const GRASS_Y_SINK = 0.04;
 
 function hash(seed: number) {
   const x = Math.sin(seed * 127.1) * 43758.5453;
@@ -45,44 +52,11 @@ function hash(seed: number) {
 function rnd(seed: number, lo: number, hi: number) {
   return lo + hash(seed) * (hi - lo);
 }
-function rndX(seed: number, xSpread: number, clearHalf: number) {
-  const gap = Math.min(clearHalf, xSpread * 0.98);
-  const pick = hash(seed * 1.93);
-  if (pick < 0.5) return rnd(seed * 2.47, -xSpread, -gap);
-  return rnd(seed * 4.11, gap, xSpread);
-}
-
-function patchMask(worldX: number, worldZ: number): number {
-  const n1 = 0.5 + 0.5 * Math.sin(worldX * 1.05 + worldZ * 0.38);
-  const n2 = 0.5 + 0.5 * Math.sin(worldX * 0.39 - worldZ * 0.71);
-  const n3 = 0.5 + 0.5 * Math.cos(worldX * 0.21 + worldZ * 0.27);
-  return n1 * n2 * 0.52 + n3 * 0.48;
-}
-
-function pickPatchyXZ(
-  seed: number,
-  scroll: number,
-  xSpread: number,
-  zMin: number,
-  zMax: number,
-): { x: number; z: number } {
-  let bestX = 0;
-  let bestZ = zMin;
-  let bestScore = -1;
-  for (let t = 0; t < PATCH_ATTEMPTS; t++) {
-    const s = seed + t * 31.71;
-    const x = rndX(s, xSpread, GRASS_PATH_CLEAR_HALF);
-    const z = zMin + rnd(s * 2.13 + t, 0, zMax - zMin);
-    const worldZ = z - scroll;
-    const score = patchMask(x, worldZ);
-    if (score > bestScore) {
-      bestScore = score;
-      bestX = x;
-      bestZ = z;
-    }
-    if (score >= PATCH_ACCEPT) return { x, z };
-  }
-  return { x: bestX, z: bestZ };
+function pickUniformXZ(seed: number, xSpread: number, zMin: number, zMax: number): { x: number; z: number } {
+  return {
+    x: rnd(seed * 2.47, -xSpread, xSpread),
+    z: zMin + rnd(seed * 3.11, 0, zMax - zMin),
+  };
 }
 
 async function resolveGrassUri(): Promise<string> {
@@ -99,6 +73,7 @@ type GrassFieldWithMapProps = { uri: string };
  */
 function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
   const scrollRef = useWorldScrollRef();
+  const { camera } = useThree();
   const meshRef = useRef<InstancedMesh>(null);
 
   const textureUrls = useMemo(() => [uri], [uri]);
@@ -126,7 +101,7 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
         uMap: { value: grassMap },
         uTime: { value: 0 },
         uWindDir: { value: new Vector3(1.0, 0.0, 0.0) },
-        uWindAmp: { value: 0.2 },
+        uWindAmp: { value: 0.02},
         uFogColor: { value: new Color(palette.fog) },
         uFogNear: { value: 6.0 },
         uFogFar: { value: 36.0 },
@@ -148,7 +123,8 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
 
           vec4 instPos = instanceMatrix * vec4( position, 1.0 );
 
-          float h = clamp( instPos.y / uBladeHeight, 0.0, 1.0 );
+          // Local blade height only (instPos.y includes instance translation → was always ≤ 0 → h stuck at 0).
+          float h = clamp( position.y / uBladeHeight, 0.0, 1.0 );
 
           vec4 worldPos = modelMatrix * instPos;
 
@@ -207,7 +183,6 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
   const state = useRef({
     x: new Float32Array(GRASS_COUNT),
     z: new Float32Array(GRASS_COUNT),
-    rotY: new Float32Array(GRASS_COUNT),
     scaleXZ: new Float32Array(GRASS_COUNT),
     scaleY: new Float32Array(GRASS_COUNT),
     initialized: false,
@@ -221,16 +196,7 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
 
   const xSpread = GROUND_WIDTH * GRASS_X_SPREAD_MUL;
 
-  const writeInstance = (i: number, mesh: InstancedMesh) => {
-    const st = state.current;
-    pos.set(st.x[i]!, GROUND_SURFACE_Y, st.z[i]!);
-    quat.setFromAxisAngle(yAxis, st.rotY[i]!);
-    scaleV.set(st.scaleXZ[i]!, st.scaleY[i]!, st.scaleXZ[i]!);
-    mat4.compose(pos, quat, scaleV);
-    mesh.setMatrixAt(i, mat4);
-  };
-
-  const initLayout = (mesh: InstancedMesh) => {
+  const initLayout = () => {
     const st = state.current;
     if (st.initialized) return;
     st.initialized = true;
@@ -238,43 +204,52 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
     const zMin = TREE_SPAWN_Z + 0.5;
     const zMax = TREE_SPAWN_Z + zSpan;
     for (let i = 0; i < GRASS_COUNT; i++) {
-      const { x, z } = pickPatchyXZ(i * 2.17 + 1.3, 0, xSpread, zMin, zMax);
+      const { x, z } = pickUniformXZ(i * 2.17 + 1.3, xSpread, zMin, zMax);
       st.x[i] = x;
       st.z[i] = z;
-      st.rotY[i] = rnd(i * 7.19, 0, Math.PI);
-      st.scaleXZ[i] = rnd(i * 4.43 + 2.1, 0.72, 1.22);
+      st.scaleXZ[i] = rnd(i * 4.43 + 2.1, GRASS_SCALE_XZ_MIN, GRASS_SCALE_XZ_MAX);
       st.scaleY[i] = rnd(i * 5.87 + 3.2, 0.78, 1.45);
-      writeInstance(i, mesh);
     }
-    mesh.instanceMatrix.needsUpdate = true;
   };
 
-  useFrame((_s, dt) => {
+  const timeStartRef = useRef<number | null>(null);
+
+  useFrame(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
-    initLayout(mesh);
+    initLayout();
 
-    const delta = Math.min(dt, 0.1);
-    material.uniforms.uTime.value += delta;
+    const mat = mesh.material as ShaderMaterial;
+    if (timeStartRef.current === null) timeStartRef.current = performance.now();
+    mat.uniforms.uTime.value = (performance.now() - timeStartRef.current) * 0.001;
+
+    camera.updateMatrixWorld();
 
     const scroll = scrollRef?.current ?? 0;
+    const camX = camera.position.x;
+    const camZ = camera.position.z;
     const st = state.current;
-    let recycled = 0;
+
     for (let i = 0; i < GRASS_COUNT; i++) {
       if (-scroll + st.z[i]! > TREE_RECYCLE_Z) {
         const zLo = TREE_SPAWN_Z + scroll;
         const zHi = zLo + 10;
-        const { x, z } = pickPatchyXZ(scroll + i * 5.73, scroll, xSpread, zLo, zHi);
+        const { x, z } = pickUniformXZ(scroll + i * 5.73, xSpread, zLo, zHi);
         st.x[i] = x;
         st.z[i] = z;
-        st.rotY[i] = rnd(scroll + i * 11.31, 0, Math.PI);
-        st.scaleXZ[i] = rnd(scroll + i * 3.17 + 0.4, 0.72, 1.22);
+        st.scaleXZ[i] = rnd(scroll + i * 3.17 + 0.4, GRASS_SCALE_XZ_MIN, GRASS_SCALE_XZ_MAX);
         st.scaleY[i] = rnd(scroll + i * 2.71 + 0.9, 0.78, 1.45);
-        writeInstance(i, mesh);
-        recycled++;
       }
+
+      const wx = st.x[i]!;
+      const wz = st.z[i]! - scroll;
+      quat.setFromAxisAngle(yAxis, Math.atan2(camX - wx, camZ - wz));
+      pos.set(wx, GROUND_SURFACE_Y - GRASS_Y_SINK, st.z[i]!);
+      scaleV.set(st.scaleXZ[i]!, st.scaleY[i]!, st.scaleXZ[i]!);
+      mat4.compose(pos, quat, scaleV);
+      mesh.setMatrixAt(i, mat4);
     }
-    if (recycled > 0) mesh.instanceMatrix.needsUpdate = true;
+    mesh.instanceMatrix.needsUpdate = true;
   });
 
   return (
