@@ -102,6 +102,7 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
       uniforms: {
         uMap: { value: grassMap },
         uTime: { value: 0 },
+        uCameraWorld: { value: new Vector3() },
         uWindDir: { value: new Vector3(1.0, 0.0, 0.0) },
         uWindAmp: { value: 0.02},
         uFogColor: { value: new Color(palette.fog) },
@@ -112,6 +113,7 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
       },
       vertexShader: /* glsl */ `
         uniform float uTime;
+        uniform vec3 uCameraWorld;
         uniform vec3 uWindDir;
         uniform float uWindAmp;
         uniform float uCurveRadius;
@@ -123,12 +125,23 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
         void main() {
           vUv = uv;
 
-          vec4 instPos = instanceMatrix * vec4( position, 1.0 );
+          // Instance matrix = translation + scale only (no CPU rotation). Yaw billboard here.
+          vec3 baseInst = ( instanceMatrix * vec4( 0.0, 0.0, 0.0, 1.0 ) ).xyz;
+          vec3 vertInst = ( instanceMatrix * vec4( position, 1.0 ) ).xyz;
+          vec3 off = vertInst - baseInst;
 
-          // Local blade height only (instPos.y includes instance translation → was always ≤ 0 → h stuck at 0).
+          vec3 baseWorld = ( modelMatrix * vec4( baseInst, 1.0 ) ).xyz;
+          float ang = atan( uCameraWorld.x - baseWorld.x, uCameraWorld.z - baseWorld.z );
+          float co = cos( ang );
+          float si = sin( ang );
+          float rx = off.x * co + off.z * si;
+          float rz = -off.x * si + off.z * co;
+          vec3 instBillboard = baseInst + vec3( rx, off.y, rz );
+
+          vec4 worldPos = modelMatrix * vec4( instBillboard, 1.0 );
+
+          // Local blade height only (attribute position.y, not translated world Y).
           float h = clamp( position.y / uBladeHeight, 0.0, 1.0 );
-
-          vec4 worldPos = modelMatrix * instPos;
 
           float phase = worldPos.x * 1.4 + worldPos.z * 0.9;
           float gust = sin( uTime * 1.55 + phase ) * 0.72
@@ -192,9 +205,10 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
 
   const mat4 = useMemo(() => new Matrix4(), []);
   const pos = useMemo(() => new Vector3(), []);
-  const quat = useMemo(() => new Quaternion(), []);
   const scaleV = useMemo(() => new Vector3(), []);
-  const yAxis = useMemo(() => new Vector3(0, 1, 0), []);
+  const identityQuat = useMemo(() => new Quaternion(), []);
+  const camWorld = useMemo(() => new Vector3(), []);
+  const uploadAllInstanceMatricesRef = useRef(true);
 
   const xSpread = GROUND_WIDTH * GRASS_X_SPREAD_MUL;
 
@@ -222,12 +236,27 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
     if (timeStartRef.current === null) timeStartRef.current = performance.now();
     mat.uniforms.uTime.value = (performance.now() - timeStartRef.current) * 0.001;
 
-    camera.updateMatrixWorld();
+    camera.getWorldPosition(camWorld);
+    mat.uniforms.uCameraWorld.value.copy(camWorld);
 
     const scroll = scrollRef?.current ?? 0;
-    const camX = camera.position.x;
-    const camZ = camera.position.z;
     const st = state.current;
+    let instanceChanged = false;
+
+    const writeMatrix = (i: number) => {
+      pos.set(st.x[i]!, GROUND_SURFACE_Y - GRASS_Y_SINK, st.z[i]!);
+      scaleV.set(st.scaleXZ[i]!, st.scaleY[i]!, st.scaleXZ[i]!);
+      mat4.compose(pos, identityQuat, scaleV);
+      mesh.setMatrixAt(i, mat4);
+    };
+
+    if (uploadAllInstanceMatricesRef.current) {
+      for (let i = 0; i < GRASS_COUNT; i++) {
+        writeMatrix(i);
+      }
+      uploadAllInstanceMatricesRef.current = false;
+      instanceChanged = true;
+    }
 
     for (let i = 0; i < GRASS_COUNT; i++) {
       if (-scroll + st.z[i]! > TREE_RECYCLE_Z) {
@@ -238,17 +267,12 @@ function GrassFieldWithMap({ uri }: GrassFieldWithMapProps) {
         st.z[i] = z;
         st.scaleXZ[i] = rnd(scroll + i * 3.17 + 0.4, GRASS_SCALE_XZ_MIN, GRASS_SCALE_XZ_MAX);
         st.scaleY[i] = rnd(scroll + i * 2.71 + 0.9, 0.78, 1.45);
+        writeMatrix(i);
+        instanceChanged = true;
       }
-
-      const wx = st.x[i]!;
-      const wz = st.z[i]! - scroll;
-      quat.setFromAxisAngle(yAxis, Math.atan2(camX - wx, camZ - wz));
-      pos.set(wx, GROUND_SURFACE_Y - GRASS_Y_SINK, st.z[i]!);
-      scaleV.set(st.scaleXZ[i]!, st.scaleY[i]!, st.scaleXZ[i]!);
-      mat4.compose(pos, quat, scaleV);
-      mesh.setMatrixAt(i, mat4);
     }
-    mesh.instanceMatrix.needsUpdate = true;
+
+    if (instanceChanged) mesh.instanceMatrix.needsUpdate = true;
   });
 
   return (
