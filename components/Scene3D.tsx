@@ -31,13 +31,12 @@ import { GROUND_SURFACE_Y, SCENE_FOG_FAR, SCENE_FOG_NEAR, TRAVELER_FOOT_CLEARANC
 const DISPLAY_SCALE = 1.35 * 0.252;
 
 /**
- * Fixed rig. Camera sits back and slightly below the look target so the horizon
- * lands in the bottom ~40% of the viewport — the top majority of the frame is sky,
- * the traveler stays pinned near the bottom.
+ * Fixed rig. Pitched to keep the horizon low while the hero sits higher in the
+ * frame — leaves room for the in-app tab bar without covering the traveler.
  */
-const VIEW_CAMERA_Y = 0.3;
-const VIEW_CAMERA_Z = 2.8;
-const VIEW_LOOK_Y = 0.52;
+const VIEW_CAMERA_Y = 0.38;
+const VIEW_CAMERA_Z = 2.85;
+const VIEW_LOOK_Y = 0.36;
 const VIEW_LOOK_Z = 0;
 
 function useLocalModelUri(assetModule: number) {

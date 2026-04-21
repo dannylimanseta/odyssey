@@ -2,10 +2,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Pedometer } from 'expo-sensors';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { FloatingTabBar, type MainTab } from './components/FloatingTabBar';
 import { Scene3D } from './components/Scene3D';
 
-export default function App() {
+function AppContent() {
+  const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState<MainTab>('journey');
   const [steps, setSteps] = useState(0);
   const [permission, setPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [available, setAvailable] = useState<boolean | null>(null);
@@ -36,23 +40,51 @@ export default function App() {
 
   return (
     <View style={styles.screen}>
-      <View style={styles.canvas}>
-        <Scene3D steps={steps} />
-      </View>
+      {activeTab === 'journey' && (
+        <>
+          <View style={styles.canvas}>
+            <Scene3D steps={steps} />
+          </View>
 
-      <View style={styles.header} pointerEvents="none">
-        <Text style={styles.title}>Odyssey</Text>
-        <Text style={styles.subtitle}>
-          {available === false && 'Pedometer not available on this device.'}
-          {available !== false && permission === 'denied' && 'Motion permission is required to count steps.'}
-          {available !== false && permission === 'granted' && 'Steps today (session)'}
-          {available !== false && permission === 'unknown' && 'Setting up…'}
-        </Text>
-        <Text style={styles.steps}>{steps}</Text>
-      </View>
+          <View style={styles.header} pointerEvents="none">
+            <Text style={styles.title}>Odyssey</Text>
+            <Text style={styles.subtitle}>
+              {available === false && 'Pedometer not available on this device.'}
+              {available !== false && permission === 'denied' && 'Motion permission is required to count steps.'}
+              {available !== false && permission === 'granted' && 'Steps today (session)'}
+              {available !== false && permission === 'unknown' && 'Setting up…'}
+            </Text>
+            <Text style={styles.steps}>{steps}</Text>
+          </View>
+        </>
+      )}
+
+      {activeTab === 'collections' && (
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderTitle}>Collections</Text>
+          <Text style={styles.placeholderBody}>Your finds and mementos will live here.</Text>
+        </View>
+      )}
+
+      {activeTab === 'settings' && (
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderTitle}>Settings</Text>
+          <Text style={styles.placeholderBody}>Tune your walk, audio, and reminders here.</Text>
+        </View>
+      )}
+
+      <FloatingTabBar active={activeTab} onChange={setActiveTab} bottomInset={insets.bottom} />
 
       <StatusBar style="light" />
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 
@@ -100,5 +132,25 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.32)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+  },
+  placeholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingBottom: 100,
+    backgroundColor: '#0b1020',
+  },
+  placeholderTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: '#f4f4f8',
+    marginBottom: 10,
+  },
+  placeholderBody: {
+    fontSize: 16,
+    color: 'rgba(240,243,255,0.72)',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
