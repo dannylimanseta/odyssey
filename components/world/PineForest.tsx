@@ -37,9 +37,10 @@ import { useWorldScrollRef } from './ScrollContext';
 const TREE_SPRITE_MODULES = [treeImg1, treeImg2, treeImg3, treeImg4] as const;
 const NUM_SPRITE_VARIANTS = TREE_SPRITE_MODULES.length;
 
-const TREE_SCALE = 1.2;
+const TREE_SCALE = 1.58;
 const SPRITE_W = 1.25 * TREE_SCALE;
-const SPRITE_H = 1.9 * TREE_SCALE;
+/** Taller than wide so silhouettes read as full pines at larger world scale. */
+const SPRITE_H = 2.12 * TREE_SCALE;
 /** Extra downward nudge so sprite bases sit slightly deeper into the lawn. */
 const SPRITE_GROUND_SINK = 0.09;
 /** Radians; tilt around local X after yaw (billboard wind lean). */
@@ -187,7 +188,8 @@ function PineForestInstanced({ uris }: InstancedProps) {
   const zAxis = useMemo(() => new Vector3(0, 0, 1), []);
   const scaleV = useMemo(() => new Vector3(1, 1, 1), []);
 
-  const xSpread = GROUND_WIDTH * 0.4;
+  /** Narrower band — trees hug the path more than `0.4 * GROUND_WIDTH`. */
+  const xSpread = GROUND_WIDTH * 0.3;
 
   const initLayout = () => {
     const st = state.current;
