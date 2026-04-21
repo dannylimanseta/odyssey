@@ -11,7 +11,7 @@ import {
   Mesh,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
-  PCFSoftShadowMap,
+  PCFShadowMap,
 } from 'three';
 import type { AnimationClip, Group } from 'three';
 
@@ -194,7 +194,7 @@ export function Scene3D({ steps }: { steps: number }) {
             scene.background = new Color(palette.skyTop);
             scene.fog = new Fog(new Color(palette.fog), SCENE_FOG_NEAR, SCENE_FOG_FAR);
             gl.shadowMap.enabled = true;
-            gl.shadowMap.type = PCFSoftShadowMap;
+            gl.shadowMap.type = PCFShadowMap;
             camera.lookAt(0, VIEW_LOOK_Y, VIEW_LOOK_Z);
             camera.updateProjectionMatrix();
           }}
